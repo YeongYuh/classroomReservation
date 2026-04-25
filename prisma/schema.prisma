@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Users & Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id               String          @id @default(cuid())
+  email            String          @unique
+  emailVerified    DateTime?
+  image            String?
+  name             String?
+  passwordHash     String?
+  role             Role            @default(STUDENT)
+  createdAt        DateTime        @default(now())
+  teacherProfile   TeacherProfile?
+  reservations     Reservation[]
+  sentMessages     Message[]       @relation("Sender")
+  receivedMessages Message[]       @relation("Receiver")
+  reviews          Review[]
+  accounts         Account[]
+  sessions         Session[]
+}
+
+// NextAuth.js v5 required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum Role {
+  TEACHER
+  STUDENT
+  ADMIN
+}
+
+// ---------------------------------------------------------------------------
+// Teacher
+// ---------------------------------------------------------------------------
+
+model TeacherProfile {
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  certUrls    String       @default("[]") // JSON array stored as text (SQLite compat)
+  youtubeUrl  String?
+  isVerified  Boolean      @default(false)
+  isHidden    Boolean      @default(false)
+  commission  Commission?
+  courses     Course[]
+  lineNotifyToken String?
+}
+
+// ---------------------------------------------------------------------------
+// Courses
+// ---------------------------------------------------------------------------
+
+model Course {
+  id           String        @id @default(cuid())
+  teacherId    String
+  teacher      TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  title        String
+  tags         String        @default("[]") // JSON array stored as text (SQLite compat)
+  description  String?
+  location     String
+  startAt      DateTime
+  durationMin  Int
+  maxSlots     Int
+  price        Decimal
+  status       CourseStatus  @default(ACTIVE)
+  reservations Reservation[]
+  reviews      Review[]
+  createdAt    DateTime      @default(now())
+
+  @@index([startAt])
+}
+
+enum CourseStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// Reservations & Payments
+// ---------------------------------------------------------------------------
+
+model Reservation {
+  id          String            @id @default(cuid())
+  courseId    String
+  course      Course            @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status      ReservationStatus @default(PENDING)
+  qrCode      String?           @unique
+  paidAt      DateTime?
+  cancelledAt DateTime?
+  payment     Payment?
+  createdAt   DateTime          @default(now())
+
+  @@unique([courseId, userId])
+}
+
+enum ReservationStatus {
+  PENDING
+  PAID
+  ATTENDED
+  CANCELLED
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  reservationId String        @unique
+  reservation   Reservation   @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  method        PaymentMethod @default(LINEPAY)
+  amount        Decimal
+  platformFee   Decimal
+  teacherAmount Decimal
+  txnId         String?
+  status        PaymentStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+}
+
+enum PaymentMethod {
+  LINEPAY
+  CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Reviews & Messages
+// ---------------------------------------------------------------------------
+
+model Review {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([courseId, userId])
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  senderId   String
+  sender     User      @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User      @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Commission & Billing
+// ---------------------------------------------------------------------------
+
+model Commission {
+  id         String         @id @default(cuid())
+  teacherId  String         @unique
+  teacher    TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  plan       CommissionPlan @default(PERCENTAGE)
+  rate       Decimal
+  billingDay Int?
+}
+
+enum CommissionPlan {
+  PERCENTAGE
+  MONTHLY
+}
+
+model MonthlyPayment {
+  id        String   @id @default(cuid())
+  teacherId String
+  yearMonth String   // "2026-05"
+  paidAt    DateTime @default(now())
+  note      String?
+
+  @@unique([teacherId, yearMonth])
+  @@index([yearMonth])
+}
+
+// ---------------------------------------------------------------------------
+// Advertisements
+// ---------------------------------------------------------------------------
+
+model Advertisement {
+  id       String   @id @default(cuid())
+  slot     AdSlot
+  imageUrl String
+  linkUrl  String?
+  startAt  DateTime
+  endAt    DateTime
+  isActive Boolean  @default(true)
+}
+
+enum AdSlot {
+  HOMEPAGE_BANNER
+  FEATURED_TEACHER
+}

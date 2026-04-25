@@ -1,0 +1,51 @@
+import { NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
+import { z } from 'zod'
+import { prisma } from '@/lib/prisma'
+import { Role } from '@prisma/client'
+
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  name: z.string().min(1),
+  role: z.enum(['STUDENT', 'TEACHER']).default('STUDENT'),
+})
+
+export async function POST(request: Request) {
+  const body = await request.json()
+  const parsed = registerSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: '資料格式錯誤' }, { status: 400 })
+  }
+
+  const { email, password, name, role } = parsed.data
+
+  const existing = await prisma.user.findUnique({ where: { email } })
+  if (existing) {
+    return NextResponse.json({ error: '此 Email 已被註冊' }, { status: 409 })
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12)
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      name,
+      passwordHash,
+      role: role as Role,
+      ...(role === 'TEACHER'
+        ? {
+            teacherProfile: {
+              create: {
+                displayName: name,
+                isVerified: false,
+                isHidden: false,
+              },
+            },
+          }
+        : {}),
+    },
+  })
+
+  return NextResponse.json({ id: user.id }, { status: 201 })
+}
