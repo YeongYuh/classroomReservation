@@ -10,7 +10,9 @@ export interface ReportRow {
 const HEADERS = ['日期', '課程名', '學員', '金額', '平台抽成', '老師所得']
 
 function escapeField(value: string | number): string {
-  const str = String(value)
+  let str = String(value)
+  // Prefix formula-injection starters so spreadsheet apps treat the cell as text
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`
   }

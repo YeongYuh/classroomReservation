@@ -5,17 +5,30 @@ import { prisma } from '@/lib/prisma'
 import { Role, AdSlot } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 
+function requireHttpUrl(value: string, field: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    throw new Error(`${field} 不是有效的 URL`)
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`${field} 必須使用 http 或 https`)
+  }
+  return value
+}
+
 export async function createAd(formData: FormData) {
   const session = await auth()
   if (!session || session.user.role !== Role.ADMIN) throw new Error('Unauthorized')
 
   const slot = formData.get('slot') as string
-  const imageUrl = (formData.get('imageUrl') as string).trim()
-  const linkUrl = (formData.get('linkUrl') as string).trim() || null
+  const imageUrl = requireHttpUrl((formData.get('imageUrl') as string).trim(), 'imageUrl')
+  const linkUrlRaw = (formData.get('linkUrl') as string).trim() || null
+  const linkUrl = linkUrlRaw ? requireHttpUrl(linkUrlRaw, 'linkUrl') : null
   const startAt = new Date(formData.get('startAt') as string)
   const endAt = new Date(formData.get('endAt') as string)
 
-  if (!imageUrl) throw new Error('imageUrl is required')
   if (!Object.values(AdSlot).includes(slot as AdSlot)) throw new Error('Invalid slot')
   if (isNaN(startAt.getTime()) || isNaN(endAt.getTime())) throw new Error('Invalid dates')
   if (endAt <= startAt) throw new Error('endAt must be after startAt')

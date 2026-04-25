@@ -117,8 +117,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ returnCode: '0002', returnMessage: 'Invalid body' }, { status: 400 })
   }
 
+  const transactionIdStr = String(body.transactionId)
+
+  // Replay guard: if this transactionId is already COMPLETED, return idempotent success
+  // without calling the external LINE Pay API again.
+  const alreadyConfirmed = await prisma.payment.findFirst({
+    where: { txnId: transactionIdStr, status: PaymentStatus.COMPLETED },
+    select: { id: true },
+  })
+  if (alreadyConfirmed) {
+    return NextResponse.json({ returnCode: '0000', returnMessage: 'OK' })
+  }
+
   try {
-    await processConfirm(String(body.transactionId), body.orderId)
+    await processConfirm(transactionIdStr, body.orderId)
     return NextResponse.json({ returnCode: '0000', returnMessage: 'OK' })
   } catch (err) {
     const e = err as { message?: string; statusCode?: number }

@@ -61,4 +61,18 @@ describe('buildReportCsv', () => {
     const csv = buildReportCsv([makeRow()])
     expect(csv).toContain('\r\n')
   })
+
+  it('prefixes = formula with single quote to prevent formula injection', () => {
+    const csv = buildReportCsv([makeRow({ studentName: '=HYPERLINK("http://evil.com")' })])
+    expect(csv).toContain("'=HYPERLINK")
+  })
+
+  it('prefixes + - @ formula starters with single quote', () => {
+    const csvPlus = buildReportCsv([makeRow({ courseTitle: '+cmd' })])
+    const csvAt = buildReportCsv([makeRow({ courseTitle: '@SUM' })])
+    const csvMinus = buildReportCsv([makeRow({ courseTitle: '-1+2' })])
+    expect(csvPlus).toContain("'+cmd")
+    expect(csvAt).toContain("'@SUM")
+    expect(csvMinus).toContain("'-1+2")
+  })
 })

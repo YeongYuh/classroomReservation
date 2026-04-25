@@ -63,7 +63,10 @@ export async function GET(
   }))
 
   const csv = buildReportCsv(rows)
-  const filename = `report_${profile.displayName}_${yearMonth ?? 'all'}.csv`
+  // Strip characters that could break Content-Disposition header (header injection)
+  const safeName = profile.displayName.replace(/[^\w一-鿿-]/g, '_')
+  const safeMonth = (yearMonth ?? 'all').replace(/[^\w-]/g, '')
+  const filename = `report_${safeName}_${safeMonth}.csv`
 
   return new Response('﻿' + csv, {
     headers: {
