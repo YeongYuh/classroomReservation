@@ -47,7 +47,8 @@ export default async function ProfilePage({
 
   const banner = payment ? bannerMap[payment] : null
 
-  const rawReservations = session?.user.id
+  type Reservation = Awaited<ReturnType<typeof getReservations>>[number]
+  const rawReservations: Reservation[] = session?.user.id
     ? await getReservations(session.user.id)
     : []
 
