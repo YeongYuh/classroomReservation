@@ -7,7 +7,8 @@ function createPrismaClient() {
     process.env.DATABASE_URL ??
     `file://${path.join(process.cwd(), 'prisma', 'dev.db')}`
 
-  const adapter = new PrismaLibSql({ url })
+  const authToken = process.env.TURSO_AUTH_TOKEN
+  const adapter = new PrismaLibSql({ url, ...(authToken ? { authToken } : {}) })
   return new PrismaClient({ adapter })
 }
 
