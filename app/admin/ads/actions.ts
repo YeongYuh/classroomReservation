@@ -4,19 +4,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Role, AdSlot } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
-
-function requireHttpUrl(value: string, field: string): string {
-  let parsed: URL
-  try {
-    parsed = new URL(value)
-  } catch {
-    throw new Error(`${field} 不是有效的 URL`)
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`${field} 必須使用 http 或 https`)
-  }
-  return value
-}
+import { requireHttpUrl } from '@/lib/validate-url'
 
 export async function createAd(formData: FormData) {
   const session = await auth()

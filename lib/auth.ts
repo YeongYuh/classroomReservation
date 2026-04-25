@@ -6,10 +6,11 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from './prisma'
 import { Role } from '@prisma/client'
+import { checkRateLimit, getClientIp } from './rate-limit'
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -21,7 +22,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers: [
     Credentials({
-      async authorize(credentials) {
+      async authorize(credentials, request) {
+        const ip = getClientIp(request as unknown as Request)
+        const { allowed } = checkRateLimit(`login:${ip}`, { maxAttempts: 10, windowMs: 15 * 60 * 1000 })
+        if (!allowed) return null
+
         const parsed = loginSchema.safeParse(credentials)
         if (!parsed.success) return null
 

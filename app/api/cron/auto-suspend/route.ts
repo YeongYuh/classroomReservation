@@ -1,13 +1,16 @@
+import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { shouldAutoSuspend } from '@/lib/auto-suspend'
 
 // Vercel Cron calls this with an Authorization header bearing CRON_SECRET.
 function isCronAuthorized(req: Request): boolean {
-  const auth = req.headers.get('authorization')
+  const incoming = req.headers.get('authorization') ?? ''
   const secret = process.env.CRON_SECRET
   if (!secret) return false
-  return auth === `Bearer ${secret}`
+  const expected = `Bearer ${secret}`
+  if (incoming.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(incoming), Buffer.from(expected))
 }
 
 export async function GET(req: Request): Promise<NextResponse> {

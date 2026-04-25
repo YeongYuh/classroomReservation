@@ -3,15 +3,25 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { Role } from '@prisma/client'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   name: z.string().min(1),
   role: z.enum(['STUDENT', 'TEACHER']).default('STUDENT'),
 })
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request)
+  const { allowed, retryAfterSec } = checkRateLimit(`register:${ip}`, { maxAttempts: 10, windowMs: 15 * 60 * 1000 })
+  if (!allowed) {
+    return NextResponse.json(
+      { error: '請求過於頻繁，請稍後再試' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+    )
+  }
+
   const body = await request.json()
   const parsed = registerSchema.safeParse(body)
   if (!parsed.success) {

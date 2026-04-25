@@ -36,8 +36,12 @@ export async function GET(
     return NextResponse.json({ error: '預約不存在' }, { status: 404 })
   }
 
-  // Only the teacher who owns the course or an admin can verify
-  const isTeacherOwner = reservation.course.teacherId === session.user.id
+  // course.teacherId is TeacherProfile.id, not User.id — look up the profile first
+  const teacherProfile = await prisma.teacherProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true },
+  })
+  const isTeacherOwner = !!teacherProfile && teacherProfile.id === reservation.course.teacherId
   const isAdmin = session.user.role === 'ADMIN'
   if (!isTeacherOwner && !isAdmin) {
     return NextResponse.json({ error: '無權限' }, { status: 403 })
