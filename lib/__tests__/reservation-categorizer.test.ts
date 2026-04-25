@@ -8,9 +8,11 @@ function makeRes(
 ): ReservationForDisplay {
   return {
     id: 'res_1',
+    courseId: 'course_1',
     status: 'PAID',
     qrCode: null,
     paidAt: new Date('2026-04-20T10:00:00Z'),
+    hasReview: false,
     course: {
       title: 'Yoga',
       location: '台北',

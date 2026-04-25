@@ -1,10 +1,13 @@
 import { PrismaClient, Role, CourseStatus } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
+import bcrypt from 'bcryptjs'
 import path from 'path'
 
 const dbUrl = `file://${path.join(process.cwd(), 'prisma', 'dev.db')}`
 const adapter = new PrismaLibSql({ url: dbUrl })
 const prisma = new PrismaClient({ adapter })
+
+const TEST_PASSWORD_HASH = await bcrypt.hash('Test1234!', 10)
 
 async function main() {
   console.warn('🌱 Seeding database...')
@@ -22,12 +25,12 @@ async function main() {
 
   // Admin
   const admin = await prisma.user.create({
-    data: { id: 'admin-001', email: 'admin@platform.com', role: Role.ADMIN },
+    data: { id: 'admin-001', email: 'admin@platform.com', role: Role.ADMIN, passwordHash: TEST_PASSWORD_HASH },
   })
 
   // Teacher 1 — verified, active
   const teacher1User = await prisma.user.create({
-    data: { id: 'teacher-001', email: 'chloe@yoga.com', role: Role.TEACHER },
+    data: { id: 'teacher-001', email: 'chloe@yoga.com', role: Role.TEACHER, passwordHash: TEST_PASSWORD_HASH },
   })
   const teacher1 = await prisma.teacherProfile.create({
     data: {
@@ -47,7 +50,7 @@ async function main() {
 
   // Teacher 2 — pending review
   const teacher2User = await prisma.user.create({
-    data: { id: 'teacher-002', email: 'max@aerobics.com', role: Role.TEACHER },
+    data: { id: 'teacher-002', email: 'max@aerobics.com', role: Role.TEACHER, passwordHash: TEST_PASSWORD_HASH },
   })
   await prisma.teacherProfile.create({
     data: {
@@ -62,7 +65,7 @@ async function main() {
 
   // Student
   const student = await prisma.user.create({
-    data: { id: 'student-001', email: 'alice@example.com', role: Role.STUDENT },
+    data: { id: 'student-001', email: 'alice@example.com', role: Role.STUDENT, passwordHash: TEST_PASSWORD_HASH },
   })
 
   // Courses (under verified teacher only)
