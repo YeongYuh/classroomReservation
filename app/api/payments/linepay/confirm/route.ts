@@ -7,12 +7,12 @@ import { calculateCommission } from '@/lib/commission'
 import { generateQrPayload, generateQrImage } from '@/lib/qr'
 import { sendBookingConfirmation } from '@/lib/email'
 import { buildEnrollmentNotifyMessage, sendLineNotify } from '@/lib/line-notify'
+import { requireEnv } from '@/lib/get-env'
 
-const CHANNEL_SECRET = process.env.LINEPAY_CHANNEL_SECRET_KEY ?? ''
-const QR_SECRET = process.env.QR_SECRET ?? 'dev-qr-secret'
 const DEFAULT_COMMISSION_RATE = 0.15
 
 async function processConfirm(transactionId: string, orderId: string) {
+  const QR_SECRET = requireEnv('QR_SECRET')
   const reservation = await prisma.$transaction(async (tx) => {
     const res = await tx.reservation.findUnique({
       where: { id: orderId },
@@ -99,6 +99,7 @@ async function processConfirm(transactionId: string, orderId: string) {
 // ── POST — server-to-server webhook from LINE Pay ──────────────────────────
 
 export async function POST(request: Request) {
+  const CHANNEL_SECRET = requireEnv('LINEPAY_CHANNEL_SECRET_KEY')
   const rawBody = await request.text()
   const nonce = request.headers.get('X-LINE-Authorization-Nonce') ?? ''
   const signature = request.headers.get('X-LINE-Authorization') ?? ''

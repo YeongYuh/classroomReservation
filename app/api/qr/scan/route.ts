@@ -4,8 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { Role, ReservationStatus } from '@prisma/client'
 import { z } from 'zod'
 import { processScanResult, ScanOutcome } from '@/lib/qr-scan'
-
-const QR_SECRET = process.env.QR_SECRET ?? 'dev-qr-secret'
+import { requireEnv } from '@/lib/get-env'
 
 const schema = z.object({ payload: z.string().min(1) })
 
@@ -61,7 +60,7 @@ export async function POST(request: Request) {
 
   const result = processScanResult({
     payload,
-    secret: QR_SECRET,
+    secret: requireEnv('QR_SECRET'),
     reservation: reservation
       ? { id: reservation.id, status: reservation.status, courseTeacherId: reservation.course.teacherId }
       : null,

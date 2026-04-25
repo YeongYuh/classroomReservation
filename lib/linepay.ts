@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { requireEnv } from './get-env'
 
 const IS_SANDBOX = process.env.LINEPAY_IS_SANDBOX !== 'false'
 const LINEPAY_BASE = IS_SANDBOX
@@ -57,8 +58,8 @@ function makeHeaders(channelId: string, channelSecret: string, path: string, bod
 
 function getCredentials() {
   return {
-    channelId: process.env.LINEPAY_CHANNEL_ID ?? '',
-    channelSecret: process.env.LINEPAY_CHANNEL_SECRET_KEY ?? '',
+    channelId: requireEnv('LINEPAY_CHANNEL_ID'),
+    channelSecret: requireEnv('LINEPAY_CHANNEL_SECRET_KEY'),
   }
 }
 

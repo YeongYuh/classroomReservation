@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { verifyQrPayload } from '@/lib/qr'
-
-const QR_SECRET = process.env.QR_SECRET ?? 'dev-qr-secret'
+import { requireEnv } from '@/lib/get-env'
 
 // GET /api/qr/:reservationId?payload=<qr-payload>
 // Used by teacher scanning screen to verify QR code and mark attendance
@@ -20,7 +19,7 @@ export async function GET(
   const { searchParams } = new URL(request.url)
   const payload = searchParams.get('payload') ?? ''
 
-  const { valid } = verifyQrPayload(payload, QR_SECRET)
+  const { valid } = verifyQrPayload(payload, requireEnv('QR_SECRET'))
   if (!valid) {
     return NextResponse.json({ error: 'QR Code 無效' }, { status: 400 })
   }
