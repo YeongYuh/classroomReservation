@@ -5,6 +5,31 @@ import { ReservationCard } from './reservation-card'
 
 interface SearchParams { payment?: string }
 
+async function getReservations(userId: string) {
+  return prisma.reservation.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      courseId: true,
+      status: true,
+      qrCode: true,
+      paidAt: true,
+      course: {
+        select: {
+          title: true,
+          location: true,
+          startAt: true,
+          durationMin: true,
+          price: true,
+          teacher: { select: { displayName: true, avatarUrl: true } },
+          reviews: { where: { userId }, select: { id: true } },
+        },
+      },
+    },
+  })
+}
+
 export default async function ProfilePage({
   searchParams,
 }: {
@@ -23,28 +48,7 @@ export default async function ProfilePage({
   const banner = payment ? bannerMap[payment] : null
 
   const rawReservations = session?.user.id
-    ? await prisma.reservation.findMany({
-        where: { userId: session.user.id },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          courseId: true,
-          status: true,
-          qrCode: true,
-          paidAt: true,
-          course: {
-            select: {
-              title: true,
-              location: true,
-              startAt: true,
-              durationMin: true,
-              price: true,
-              teacher: { select: { displayName: true, avatarUrl: true } },
-              reviews: { where: { userId: session.user.id }, select: { id: true } },
-            },
-          },
-        },
-      })
+    ? await getReservations(session.user.id)
     : []
 
   const normalized = rawReservations.map((r) => ({
