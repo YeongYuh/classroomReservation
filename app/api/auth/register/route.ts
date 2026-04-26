@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { Role } from '@prisma/client'
+import { Role, UserStatus } from '@prisma/client'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 const registerSchema = z.object({
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       name,
       passwordHash,
       role: role as Role,
+      status: UserStatus.PENDING,
       ...(role === 'TEACHER'
         ? {
             teacherProfile: {

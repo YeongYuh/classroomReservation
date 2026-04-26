@@ -11,21 +11,23 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id               String          @id @default(cuid())
-  email            String          @unique
-  emailVerified    DateTime?
-  image            String?
-  name             String?
-  passwordHash     String?
-  role             Role            @default(STUDENT)
-  createdAt        DateTime        @default(now())
-  teacherProfile   TeacherProfile?
-  reservations     Reservation[]
-  sentMessages     Message[]       @relation("Sender")
-  receivedMessages Message[]       @relation("Receiver")
-  reviews          Review[]
-  accounts         Account[]
-  sessions         Session[]
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  emailVerified       DateTime?
+  image               String?
+  name                String?
+  passwordHash        String?
+  role                Role                 @default(STUDENT)
+  status              UserStatus           @default(PENDING)
+  createdAt           DateTime             @default(now())
+  teacherProfile      TeacherProfile?
+  reservations        Reservation[]
+  sentMessages        Message[]            @relation("Sender")
+  receivedMessages    Message[]            @relation("Receiver")
+  reviews             Review[]
+  accounts            Account[]
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 // NextAuth.js v5 required models
@@ -69,6 +71,12 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
 // ---------------------------------------------------------------------------
 // Teacher
 // ---------------------------------------------------------------------------
@@ -94,21 +102,22 @@ model TeacherProfile {
 // ---------------------------------------------------------------------------
 
 model Course {
-  id           String        @id @default(cuid())
-  teacherId    String
-  teacher      TeacherProfile @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  title        String
-  tags         String        @default("[]") // JSON array stored as text (SQLite compat)
-  description  String?
-  location     String
-  startAt      DateTime
-  durationMin  Int
-  maxSlots     Int
-  price        Decimal
-  status       CourseStatus  @default(ACTIVE)
-  reservations Reservation[]
-  reviews      Review[]
-  createdAt    DateTime      @default(now())
+  id               String            @id @default(cuid())
+  teacherId        String
+  teacher          TeacherProfile    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  title            String
+  tags             String            @default("[]") // JSON array stored as text (SQLite compat)
+  description      String?
+  location         String
+  startAt          DateTime
+  durationMin      Int
+  maxSlots         Int
+  price            Decimal
+  status           CourseStatus      @default(ACTIVE)
+  reservations     Reservation[]
+  reviews          Review[]
+  classroomBooking ClassroomBooking?
+  createdAt        DateTime          @default(now())
 
   @@index([startAt])
 }
@@ -245,4 +254,48 @@ model Advertisement {
 enum AdSlot {
   HOMEPAGE_BANNER
   FEATURED_TEACHER
+}
+
+// ---------------------------------------------------------------------------
+// Classrooms
+// ---------------------------------------------------------------------------
+
+model Classroom {
+  id        String             @id @default(cuid())
+  name      String
+  capacity  Int
+  location  String
+  openHours String             @default("[]") // JSON: [{day:0,open:"08:00",close:"22:00"}]
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  bookings  ClassroomBooking[]
+}
+
+model ClassroomBooking {
+  id          String    @id @default(cuid())
+  classroomId String
+  courseId    String    @unique
+  startAt     DateTime
+  endAt       DateTime
+  createdAt   DateTime  @default(now())
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Restrict)
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([classroomId, startAt])
+}
+
+// ---------------------------------------------------------------------------
+// Password Reset
+// ---------------------------------------------------------------------------
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -247,3 +247,262 @@ E2E             Playwright — 關鍵路徑：搜尋 → 預約 → 付款 → Q
 - 在前端 expose 其他用戶的 email/電話
 - 在 Git 中提交 LINE Pay API keys、DB credentials
 - 在 client component 直接 query DB（所有 DB 操作走 Server Action 或 API Route）
+
+---
+
+## 10. Phase 2 — 教室管理 & Dark Mode（2026-04-26 新增）
+
+### 10-A 教室管理（Admin CRUD）
+
+#### 資料模型
+
+```prisma
+model Classroom {
+  id          String   @id @default(cuid())
+  name        String                       // 教室名稱，e.g. "A館 101"
+  capacity    Int                          // 最大容納人數
+  location    String                       // 地址 / 樓層說明
+  equipment   String?                      // 設備描述（投影機、鏡牆…）
+  openHours   String   @default("[]")      // JSON: [{ day:0-6, open:"09:00", close:"22:00" }]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  bookings    ClassroomBooking[]
+  courses     Course[]
+}
+
+model ClassroomBooking {
+  id          String    @id @default(cuid())
+  classroomId String
+  courseId    String    @unique          // 一堂課對應一筆 booking
+  startAt     DateTime
+  endAt       DateTime                   // startAt + durationMin
+  classroom   Classroom @relation(fields: [classroomId], references: [id])
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([classroomId, startAt])
+}
+```
+
+`Course` 新增 `classroomId String?`（可選，未指定教室仍可建課）。
+
+#### Admin 後台 `/admin/classrooms`
+
+| 功能 | 路由 / Action |
+|---|---|
+| 教室列表（含使用率） | `GET /admin/classrooms` |
+| 新增教室 | Server Action `createClassroom` |
+| 編輯教室 | Server Action `updateClassroom` |
+| 停用教室 | Server Action `setClassroomActive` |
+
+**驗收：**
+- 管理員可 CRUD 教室（名稱、容量、地點、設備、開放時段）
+- 停用教室不刪除歷史資料，但老師選課時不顯示
+- 教室列表顯示「本月預約次數 / 使用率」
+
+---
+
+### 10-B 教師登記教室（整合進建立課程流程）
+
+#### 流程
+
+```
+老師建立課程
+  → 選教室（下拉，僅顯示 isActive=true 的教室）
+  → 選時段（startAt + durationMin 已填）
+  → 前端即時查詢衝突（GET /api/classrooms/:id/availability?startAt=&endAt=）
+  → 若衝突 → 顯示「該時段已被預約，請選其他時間或教室」，阻擋送出
+  → 若 OK → 建立 Course + ClassroomBooking（同一 transaction）
+  → maxSlots 自動上限為 min(老師設定值, classroom.capacity)
+```
+
+#### API
+
+```
+GET  /api/classrooms                     公開列出 active 教室（供老師選課用）
+GET  /api/classrooms/:id/availability    查詢時段衝突（?startAt=ISO&endAt=ISO）
+                                          回傳 { available: boolean, conflicts: [...] }
+POST /api/admin/classrooms               Admin: 建立教室
+PATCH /api/admin/classrooms/:id          Admin: 更新
+```
+
+#### 衝突邏輯（純函式，放 `lib/classroom-conflict.ts`）
+
+```ts
+// 有任何重疊即衝突（不含首尾相接）
+function hasConflict(
+  existing: { startAt: Date; endAt: Date }[],
+  newStart: Date,
+  newEnd: Date,
+): boolean {
+  return existing.some(e => newStart < e.endAt && newEnd > e.startAt)
+}
+```
+
+**驗收：**
+- 老師建立課程時可選教室（或留空）
+- 選定教室 + 時段後，即時顯示是否有衝突
+- 衝突時阻擋送出並顯示已預約資訊
+- maxSlots 無法超過教室容量
+- 取消課程時，對應的 ClassroomBooking 隨之刪除（Cascade）
+
+---
+
+### 10-C Dark Mode
+
+#### 實作方式
+
+使用 **`next-themes`** 管理 light/dark/system 三態：
+
+```ts
+// app/layout.tsx
+import { ThemeProvider } from 'next-themes'
+<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+  {children}
+</ThemeProvider>
+```
+
+Tailwind 設定 `darkMode: 'class'`，所有元件用 `dark:` variant。
+
+#### Toggle 元件
+
+- 位置：Header / Navbar 右上角
+- 三態循環：System → Light → Dark → System
+- 圖示：Sun / Moon / Monitor icon（lucide-react）
+- 使用者選擇存 `localStorage`（next-themes 內建）
+
+#### 色系規範（Dark Mode）
+
+| 用途 | Light | Dark |
+|---|---|---|
+| 主背景 | `gray-50` | `gray-950` |
+| 卡片背景 | `white` | `gray-900` |
+| 邊框 | `gray-100` / `gray-200` | `gray-800` |
+| 主文字 | `gray-900` | `gray-100` |
+| 次文字 | `gray-500` | `gray-400` |
+| 品牌主色（按鈕、連結） | `indigo-600` | `indigo-400` |
+| 品牌 hover | `indigo-700` | `indigo-300` |
+| 成功 | `green-600` | `green-400` |
+| 危險 | `red-600` | `red-400` |
+
+**驗收：**
+- 所有現有頁面在 Dark Mode 下可讀（無白底殘留）
+- Toggle 狀態在頁面重整後保持
+- 首次進入依系統偏好自動套用
+- Admin 後台、老師 Dashboard、公開頁面、登入/註冊頁全部支援
+
+---
+
+### 10-D 新增任務（Phase 2）
+
+優先順序：
+1. **Dark Mode 基礎設施**（ThemeProvider + Tailwind config）→ 全站套色
+2. **教室 CRUD（Admin）** → schema migration → Admin UI
+3. **衝突檢查邏輯**（純函式 + 單元測試）
+4. **課程建立整合教室**（老師端 UI 改版）
+5. **E2E 測試**（教室預約 + 衝突阻擋）
+
+---
+
+### 10-E 更新的邊界規則
+
+**Always do（新增）：**
+- 教室時段衝突在 DB transaction 內做最終確認（防 race condition），不只靠前端即時查詢
+- `maxSlots` 在 Server Action 強制 `Math.min(userInput, classroom.capacity)`
+
+**Never do（新增）：**
+- 不讓老師看到其他老師的 ClassroomBooking 詳情（只能看「此時段已被預約」）
+- 不在前端做唯一的衝突檢查（一定要在 transaction 內做 DB 級別的二次確認）
+
+---
+
+## 11. Phase 2 — 忘記密碼 / 重設密碼（2026-04-26 新增）
+
+### 11-A 資料模型
+
+```prisma
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique   // SHA-256(rawToken)，rawToken 只出現在 email URL
+  expiresAt DateTime            // createdAt + 1 小時
+  usedAt    DateTime?           // 用過後設定，防止重複使用
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+```
+
+### 11-B 完整流程
+
+```
+[忘記密碼頁 /forgot-password]
+  → 用戶輸入 Email，送出
+  → POST /api/auth/forgot-password
+      ① Rate limit: 同一 email 5 分鐘內只能送 1 封（用現有 checkRateLimit）
+      ② 查 User by email —— 無論是否存在，一律回 200（防止 email 列舉）
+      ③ 若存在：randomBytes(32).toString('hex') 產生 rawToken
+                 tokenHash = SHA-256(rawToken)
+                 寫入 PasswordResetToken { userId, tokenHash, expiresAt: now+1h }
+      ④ 用 Resend 寄信，連結：https://domain/reset-password?token=<rawToken>
+  → 前端顯示「如果此 Email 已註冊，你將在幾分鐘內收到重設連結」
+
+[重設密碼頁 /reset-password?token=xxx]
+  → 頁面載入：驗證 token 是否有效（server-side）
+      ① tokenHash = SHA-256(token query param)
+      ② 查 PasswordResetToken：tokenHash 存在 AND usedAt IS NULL AND expiresAt > now
+      ③ 無效 / 過期 → 顯示錯誤頁「連結已失效，請重新申請」
+  → 有效：顯示新密碼輸入表單（min 8 字元）
+  → 送出：POST /api/auth/reset-password
+      ① 再次驗證 token（防 race condition）
+      ② bcrypt.hash(newPassword, 12)
+      ③ Transaction：更新 User.passwordHash + 設 PasswordResetToken.usedAt = now
+      ④ 回 200，前端導向 /login?reset=1
+  → 登入頁顯示「密碼已重設，請重新登入」提示
+```
+
+### 11-C API
+
+```
+POST /api/auth/forgot-password
+  Body: { email: string }
+  Response: 200（一律，不洩漏 email 是否存在）
+  Rate limit: checkRateLimit(`forgot-password:${email}`, { maxAttempts: 1, windowMs: 5*60*1000 })
+
+POST /api/auth/reset-password
+  Body: { token: string, password: string (min 8) }
+  Response: 200 | 400 (token invalid/expired) | 422 (password too short)
+```
+
+### 11-D 頁面
+
+| 路由 | 說明 |
+|---|---|
+| `/forgot-password` | Email 輸入表單，送出後顯示說明文字 |
+| `/reset-password?token=...` | Server Component 驗 token → 有效才顯示密碼表單（Client Component）|
+
+兩頁皆放在 `app/(auth)/` 下，與現有 login / register 同一 layout。
+
+### 11-E 安全規則
+
+**Always do：**
+- rawToken 永遠不存 DB，只存 SHA-256 hash
+- 無論 email 是否存在，forgot-password 一律回相同 200 response
+- reset-password 在 DB transaction 內原子完成（更新密碼 + 標記 token 已用）
+- token 使用後立即標記 usedAt，不可重複使用
+
+**Never do：**
+- 不在 response 中透露「此 email 未註冊」
+- 不讓同一 email 在 5 分鐘內收到兩封重設信
+- 不以明文存 reset token
+
+### 11-F 驗收標準
+
+- [ ] 登入頁有「忘記密碼？」連結
+- [ ] 送出 Email 後顯示說明（無論帳號存在與否）
+- [ ] 收到的連結有效期 1 小時，過期顯示錯誤
+- [ ] 連結點擊後顯示新密碼表單，送出後導回登入頁
+- [ ] 同一連結第二次點擊顯示「已失效」
+- [ ] 5 分鐘內重複送出同一 email 顯示 rate limit 提示
+- [ ] 新密碼少於 8 字元顯示驗證錯誤
+- [ ] 單元測試：token 過期邏輯、hash 正確性、rate limit

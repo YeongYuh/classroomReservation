@@ -1,4 +1,4 @@
-import { PrismaClient, Role, CourseStatus } from '@prisma/client'
+import { PrismaClient, Role, CourseStatus, UserStatus } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 import bcrypt from 'bcryptjs'
 import path from 'path'
@@ -7,12 +7,13 @@ const dbUrl = `file://${path.join(process.cwd(), 'prisma', 'dev.db')}`
 const adapter = new PrismaLibSql({ url: dbUrl })
 const prisma = new PrismaClient({ adapter })
 
-const TEST_PASSWORD_HASH = await bcrypt.hash('Test1234!', 10)
-
 async function main() {
+  const TEST_PASSWORD_HASH = await bcrypt.hash('Test1234!', 10)
   console.warn('🌱 Seeding database...')
 
   // Clean existing data (order matters for FK constraints)
+  await prisma.classroomBooking.deleteMany()
+  await prisma.passwordResetToken.deleteMany()
   await prisma.payment.deleteMany()
   await prisma.reservation.deleteMany()
   await prisma.review.deleteMany()
@@ -21,16 +22,17 @@ async function main() {
   await prisma.course.deleteMany()
   await prisma.teacherProfile.deleteMany()
   await prisma.advertisement.deleteMany()
+  await prisma.classroom.deleteMany()
   await prisma.user.deleteMany()
 
   // Admin
   const admin = await prisma.user.create({
-    data: { id: 'admin-001', email: 'admin@platform.com', role: Role.ADMIN, passwordHash: TEST_PASSWORD_HASH },
+    data: { id: 'admin-001', email: 'admin@platform.com', role: Role.ADMIN, status: UserStatus.ACTIVE, name: '系統管理員', passwordHash: TEST_PASSWORD_HASH },
   })
 
   // Teacher 1 — verified, active
   const teacher1User = await prisma.user.create({
-    data: { id: 'teacher-001', email: 'chloe@yoga.com', role: Role.TEACHER, passwordHash: TEST_PASSWORD_HASH },
+    data: { id: 'teacher-001', email: 'chloe@yoga.com', role: Role.TEACHER, status: UserStatus.ACTIVE, name: 'Chloe', passwordHash: TEST_PASSWORD_HASH },
   })
   const teacher1 = await prisma.teacherProfile.create({
     data: {
@@ -50,7 +52,7 @@ async function main() {
 
   // Teacher 2 — pending review
   const teacher2User = await prisma.user.create({
-    data: { id: 'teacher-002', email: 'max@aerobics.com', role: Role.TEACHER, passwordHash: TEST_PASSWORD_HASH },
+    data: { id: 'teacher-002', email: 'max@aerobics.com', role: Role.TEACHER, status: UserStatus.PENDING, name: 'Max', passwordHash: TEST_PASSWORD_HASH },
   })
   await prisma.teacherProfile.create({
     data: {
@@ -65,7 +67,7 @@ async function main() {
 
   // Student
   const student = await prisma.user.create({
-    data: { id: 'student-001', email: 'alice@example.com', role: Role.STUDENT, passwordHash: TEST_PASSWORD_HASH },
+    data: { id: 'student-001', email: 'alice@example.com', role: Role.STUDENT, status: UserStatus.ACTIVE, name: 'Alice', passwordHash: TEST_PASSWORD_HASH },
   })
 
   // Courses (under verified teacher only)
@@ -144,6 +146,43 @@ async function main() {
     data: { courseId: course2.id, userId: student.id, rating: 5, comment: '老師教得很好！' },
   })
 
+  // Classrooms
+  await prisma.classroom.create({
+    data: {
+      id: 'classroom-001',
+      name: '多功能舞蹈教室 A',
+      capacity: 25,
+      location: '台北市信義區運動中心 B1',
+      openHours: JSON.stringify([
+        { day: 1, open: '08:00', close: '22:00' },
+        { day: 2, open: '08:00', close: '22:00' },
+        { day: 3, open: '08:00', close: '22:00' },
+        { day: 4, open: '08:00', close: '22:00' },
+        { day: 5, open: '08:00', close: '22:00' },
+        { day: 6, open: '09:00', close: '18:00' },
+        { day: 0, open: '09:00', close: '18:00' },
+      ]),
+      isActive: true,
+    },
+  })
+
+  await prisma.classroom.create({
+    data: {
+      id: 'classroom-002',
+      name: '有氧訓練室 B',
+      capacity: 15,
+      location: '台北市大安區健身工廠 3F',
+      openHours: JSON.stringify([
+        { day: 1, open: '07:00', close: '21:00' },
+        { day: 2, open: '07:00', close: '21:00' },
+        { day: 3, open: '07:00', close: '21:00' },
+        { day: 4, open: '07:00', close: '21:00' },
+        { day: 5, open: '07:00', close: '21:00' },
+      ]),
+      isActive: true,
+    },
+  })
+
   // Advertisement
   await prisma.advertisement.create({
     data: {
@@ -163,7 +202,8 @@ async function main() {
   - 3 courses
   - 1 paid reservation + payment
   - 1 review
-  - 1 advertisement`)
+  - 1 advertisement
+  - 2 classrooms`)
 }
 
 main()

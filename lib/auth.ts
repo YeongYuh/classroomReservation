@@ -5,7 +5,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { prisma } from './prisma'
-import { Role } from '@prisma/client'
+import { Role, UserStatus } from '@prisma/client'
 import { checkRateLimit, getClientIp } from './rate-limit'
 
 const loginSchema = z.object({
@@ -38,7 +38,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash)
         if (!valid) return null
 
-        return { id: user.id, email: user.email, name: user.name ?? '', role: user.role }
+        if (user.status === UserStatus.PENDING) return { id: user.id, email: user.email, name: user.name ?? '', role: user.role, status: user.status }
+        if (user.status === UserStatus.SUSPENDED) return null
+
+        return { id: user.id, email: user.email, name: user.name ?? '', role: user.role, status: user.status }
       },
     }),
     Google({
@@ -50,6 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as { role: Role }).role
+        token.status = (user as { status: UserStatus }).status
         token.id = user.id
       }
       return token
@@ -58,6 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token) {
         session.user.id = token.id as string
         session.user.role = token.role as Role
+        session.user.status = token.status as UserStatus
       }
       return session
     },
@@ -87,6 +92,7 @@ declare module 'next-auth' {
       name?: string | null
       image?: string | null
       role: Role
+      status: UserStatus
     }
   }
 }

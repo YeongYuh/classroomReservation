@@ -67,11 +67,11 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-10">
-      <h1 className="text-2xl font-bold">數據看板</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">數據看板</h1>
 
       {/* ── Revenue ───────────────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">收入總覽</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">收入總覽</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <RevenueCard title={`本月收入（${monthLabel}）`} stats={thisMonth} />
           <RevenueCard title="累計收入" stats={cumulative} />
@@ -80,25 +80,25 @@ export default async function AdminDashboardPage() {
 
       {/* ── Top teachers ──────────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">本月熱門老師（依預約數）</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">本月熱門老師（依預約數）</h2>
         {topTeachers.length === 0 ? (
-          <p className="text-gray-400 text-sm">本月尚無付費預約資料</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm">本月尚無付費預約資料</p>
         ) : (
-          <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+              <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase text-xs">
                 <tr>
                   <th className="px-4 py-3 text-left">排名</th>
                   <th className="px-4 py-3 text-left">老師</th>
                   <th className="px-4 py-3 text-right">預約數</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {topTeachers.map((t, i) => (
-                  <tr key={t.teacherId}>
-                    <td className="px-4 py-3 text-gray-400">#{i + 1}</td>
-                    <td className="px-4 py-3 font-medium">{t.displayName}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{t.reservationCount}</td>
+                  <tr key={t.teacherId} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <td className="px-4 py-3 text-gray-400 dark:text-gray-500">#{i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{t.displayName}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{t.reservationCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -109,8 +109,8 @@ export default async function AdminDashboardPage() {
 
       {/* ── Heatmap ───────────────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">熱門時段熱圖（本月）</h2>
-        <p className="text-xs text-gray-400 mb-3">X 軸 = 星期一～日，Y 軸 = 0–23 時</p>
+        <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">熱門時段熱圖（本月）</h2>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">X 軸 = 星期一～日，Y 軸 = 0–23 時</p>
         <HeatmapGrid heatmap={heatmap} weekdayLabels={WEEKDAY_LABELS} />
       </section>
     </div>
@@ -125,8 +125,8 @@ function RevenueCard({
   stats: { totalRevenue: number; platformFee: number; teacherAmount: number }
 }) {
   return (
-    <div className="bg-white rounded-xl shadow p-5">
-      <p className="text-sm text-gray-500 mb-3">{title}</p>
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{title}</p>
       <div className="space-y-1">
         <Row label="總收入" value={fmt(stats.totalRevenue)} bold />
         <Row label="平台抽成" value={fmt(stats.platformFee)} />
@@ -139,8 +139,8 @@ function RevenueCard({
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <div className="flex justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className={bold ? 'font-semibold text-gray-900' : 'text-gray-700'}>{value}</span>
+      <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      <span className={bold ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}>{value}</span>
     </div>
   )
 }

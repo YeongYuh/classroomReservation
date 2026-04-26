@@ -16,6 +16,8 @@ const dirs = [
   '20260424094155_init',
   '20260424102547_add_nextauth_tables',
   '20260425083005_add_monthly_payment',
+  '20260426062110_add_classroom_and_password_reset',
+  '20260426132706_add_user_status',
 ]
 
 const allStatements = []
